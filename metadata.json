@@ -1,0 +1,11 @@
+{
+  "name": "TeamSync Task Manager",
+  "description": "A comprehensive full-stack team task management application featuring project organization, real-time task tracking, role-based access control, and a data-driven dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "Authentication",
+    "Real-time Databases",
+    "Project Management",
+    "Role-based Access Control"
+  ]
+}

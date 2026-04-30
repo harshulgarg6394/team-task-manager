@@ -1,0 +1,44 @@
+{
+  "users": [
+    {
+      "id": "47734471-51cf-4896-bc2b-2362ff472007",
+      "email": "abc@123",
+      "password": "$2b$10$yz/GuoBhb/Js1dfo.khD9OASmnK2ry2bDCBdphWHRiZ0gfgcqBZAe",
+      "name": "John Doe",
+      "role": "admin"
+    },
+    {
+      "id": "724c4a10-26ab-4f97-ae24-e00ed3162e44",
+      "email": "xyz@123",
+      "password": "$2b$10$xoySGhaUhm3jV6CuqpDwAu4WZIWzkErD/x6zqETNIOvfn.1NCuNKW",
+      "name": "Jane Doe",
+      "role": "member"
+    }
+  ],
+  "projects": [
+    {
+      "id": "6d042526-3e29-427c-aa2d-3f0c54091d6b",
+      "name": "website design",
+      "description": "design",
+      "managerId": "47734471-51cf-4896-bc2b-2362ff472007",
+      "memberIds": [
+        "724c4a10-26ab-4f97-ae24-e00ed3162e44"
+      ],
+      "createdAt": "2026-04-30T13:35:31.696Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "236c6c44-1cc8-4bfc-8644-f57fae3b5aa2",
+      "title": "frontend",
+      "description": "frontend",
+      "projectId": "6d042526-3e29-427c-aa2d-3f0c54091d6b",
+      "assigneeId": "724c4a10-26ab-4f97-ae24-e00ed3162e44",
+      "status": "completed",
+      "priority": "medium",
+      "dueDate": "2026-05-09",
+      "createdAt": "2026-04-30T13:36:05.099Z",
+      "updatedAt": "2026-04-30T13:36:56.658Z"
+    }
+  ]
+}
