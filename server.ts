@@ -500,6 +500,274 @@
 
 /////////////////////////////////////
 
+// import express from "express";
+// import cors from "cors";
+// import path from "path";
+// import { fileURLToPath } from "url";
+// import fs from "fs/promises";
+// import jwt from "jsonwebtoken";
+// import bcrypt from "bcryptjs";
+// import { v4 as uuidv4 } from "uuid";
+// import { createServer as createViteServer } from "vite";
+// import dotenv from "dotenv";
+
+// dotenv.config();
+
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+// const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+// const DB_FILE = path.join(process.cwd(), "db.json");
+
+// // DB helpers
+// async function getDb() {
+//   try {
+//     const data = await fs.readFile(DB_FILE, "utf-8");
+//     return JSON.parse(data);
+//   } catch (error) {
+//     const initialDb = { users: [], projects: [], tasks: [] };
+//     await fs.writeFile(DB_FILE, JSON.stringify(initialDb, null, 2));
+//     return initialDb;
+//   }
+// }
+
+// async function saveDb(db: any) {
+//   await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2));
+// }
+
+// async function startServer() {
+//   const app = express();
+//   const PORT = Number(process.env.PORT) || 3000;
+
+//   app.use(cors());
+//   app.use(express.json());
+
+//   // ✅ ROOT ROUTE (VERY IMPORTANT for Railway)
+//   app.get("/", (req, res) => {
+//     res.send("Server is running 🚀");
+//   });
+
+//   // ================= AUTH =================
+
+//   app.post("/api/auth/signup", async (req, res) => {
+//     const { email, password, name, role } = req.body;
+//     const db = await getDb();
+
+//     if (db.users.find((u: any) => u.email === email)) {
+//       return res.status(400).json({ error: "User already exists" });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const newUser = {
+//       id: uuidv4(),
+//       email,
+//       password: hashedPassword,
+//       name,
+//       role: role || "member"
+//     };
+
+//     db.users.push(newUser);
+//     await saveDb(db);
+
+//     const token = jwt.sign({ id: newUser.id, role: newUser.role }, JWT_SECRET);
+//     res.json({ token, user: { id: newUser.id, email, name, role: newUser.role } });
+//   });
+
+//   app.post("/api/auth/login", async (req, res) => {
+//     const { email, password } = req.body;
+//     const db = await getDb();
+//     const user = db.users.find((u: any) => u.email === email);
+
+//     if (!user || !(await bcrypt.compare(password, user.password))) {
+//       return res.status(401).json({ error: "Invalid credentials" });
+//     }
+
+//     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET);
+//     res.json({ token, user: { id: user.id, email, name: user.name, role: user.role } });
+//   });
+
+//   // ================= AUTH MIDDLEWARE =================
+
+//   const authenticate = (req: any, res: any, next: any) => {
+//     const token = req.headers.authorization?.split(" ")[1];
+//     if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+//     try {
+//       const decoded = jwt.verify(token, JWT_SECRET);
+//       req.user = decoded;
+//       next();
+//     } catch {
+//       res.status(401).json({ error: "Invalid token" });
+//     }
+//   };
+
+//   // ================= PROJECTS =================
+
+//   app.get("/api/projects", authenticate, async (req: any, res) => {
+//     const db = await getDb();
+
+//     if (req.user.role === "admin") {
+//       return res.json(db.projects);
+//     }
+
+//     const projects = db.projects.filter((p: any) =>
+//       p.managerId === req.user.id || p.memberIds.includes(req.user.id)
+//     );
+
+//     res.json(projects);
+//   });
+
+//   app.post("/api/projects", authenticate, async (req: any, res) => {
+//     if (req.user.role !== "admin") {
+//       return res.status(403).json({ error: "Forbidden" });
+//     }
+
+//     const { name, description, memberIds } = req.body;
+//     const db = await getDb();
+
+//     const newProject = {
+//       id: uuidv4(),
+//       name,
+//       description,
+//       managerId: req.user.id,
+//       memberIds: memberIds || [],
+//       createdAt: new Date().toISOString()
+//     };
+
+//     db.projects.push(newProject);
+//     await saveDb(db);
+
+//     res.json(newProject);
+//   });
+
+//   // ================= TASKS =================
+
+//   app.get("/api/tasks", authenticate, async (req: any, res) => {
+//     const db = await getDb();
+//     const { projectId } = req.query;
+
+//     let tasks = db.tasks;
+
+//     if (projectId) {
+//       tasks = tasks.filter((t: any) => t.projectId === projectId);
+//     }
+
+//     if (req.user.role !== "admin") {
+//       const myProjects = db.projects
+//         .filter((p: any) =>
+//           p.managerId === req.user.id || p.memberIds.includes(req.user.id)
+//         )
+//         .map((p: any) => p.id);
+
+//       tasks = tasks.filter(
+//         (t: any) =>
+//           myProjects.includes(t.projectId) || t.assigneeId === req.user.id
+//       );
+//     }
+
+//     res.json(tasks);
+//   });
+
+//   app.post("/api/tasks", authenticate, async (req: any, res) => {
+//     const { title, description, projectId, assigneeId, priority, dueDate } = req.body;
+//     const db = await getDb();
+
+//     const project = db.projects.find((p: any) => p.id === projectId);
+//     if (!project) return res.status(404).json({ error: "Project not found" });
+
+//     if (req.user.role !== "admin" && project.managerId !== req.user.id) {
+//       return res.status(403).json({ error: "Forbidden" });
+//     }
+
+//     const newTask = {
+//       id: uuidv4(),
+//       title,
+//       description,
+//       projectId,
+//       assigneeId,
+//       status: "todo",
+//       priority: priority || "medium",
+//       dueDate,
+//       createdAt: new Date().toISOString()
+//     };
+
+//     db.tasks.push(newTask);
+//     await saveDb(db);
+
+//     res.json(newTask);
+//   });
+
+//   app.patch("/api/tasks/:id", authenticate, async (req: any, res) => {
+//     const { id } = req.params;
+//     const updates = req.body;
+//     const db = await getDb();
+
+//     const index = db.tasks.findIndex((t: any) => t.id === id);
+//     if (index === -1) return res.status(404).json({ error: "Task not found" });
+
+//     const task = db.tasks[index];
+//     const project = db.projects.find((p: any) => p.id === task.projectId);
+
+//     const isAdmin = req.user.role === "admin";
+//     const isManager = project?.managerId === req.user.id;
+//     const isAssignee = task.assigneeId === req.user.id;
+
+//     if (!isAdmin && !isManager && !isAssignee) {
+//       return res.status(403).json({ error: "Forbidden" });
+//     }
+
+//     if (!isAdmin && !isManager && isAssignee) {
+//       const allowed = ["status"];
+//       const invalid = Object.keys(updates).filter(k => !allowed.includes(k));
+//       if (invalid.length > 0) {
+//         return res.status(403).json({ error: "Only status can be updated" });
+//       }
+//     }
+
+//     db.tasks[index] = { ...task, ...updates, updatedAt: new Date().toISOString() };
+//     await saveDb(db);
+
+//     res.json(db.tasks[index]);
+//   });
+
+//   app.get("/api/users", authenticate, async (req, res) => {
+//     const db = await getDb();
+//     res.json(db.users.map((u: any) => ({
+//       id: u.id,
+//       name: u.name,
+//       email: u.email,
+//       role: u.role
+//     })));
+//   });
+
+//   // ================= VITE =================
+
+//   if (process.env.NODE_ENV !== "production") {
+//     const vite = await createViteServer({
+//       server: { middlewareMode: true },
+//       appType: "spa",
+//     });
+//     app.use(vite.middlewares);
+//   } else {
+//     // SIMPLE RESPONSE FOR PRODUCTION (avoids dist issues)
+//     app.get("*", (req, res) => {
+//       res.send("Server running in production 🚀");
+//     });
+//   }
+
+//   // ================= START SERVER =================
+
+//   app.listen(PORT, "0.0.0.0", () => {
+//     console.log(`Server running on port ${PORT}`);
+//   });
+// }
+
+// startServer();
+
+
+/////////////////////////////////////////////////////
+
+
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -542,33 +810,19 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // ✅ ROOT ROUTE (VERY IMPORTANT for Railway)
-  app.get("/", (req, res) => {
-    res.send("Server is running 🚀");
-  });
+  // --- DELETE THE OLD "ROOT ROUTE" BLOCK FROM HERE ---
 
   // ================= AUTH =================
-
   app.post("/api/auth/signup", async (req, res) => {
     const { email, password, name, role } = req.body;
     const db = await getDb();
-
     if (db.users.find((u: any) => u.email === email)) {
       return res.status(400).json({ error: "User already exists" });
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = {
-      id: uuidv4(),
-      email,
-      password: hashedPassword,
-      name,
-      role: role || "member"
-    };
-
+    const newUser = { id: uuidv4(), email, password: hashedPassword, name, role: role || "member" };
     db.users.push(newUser);
     await saveDb(db);
-
     const token = jwt.sign({ id: newUser.id, role: newUser.role }, JWT_SECRET);
     res.json({ token, user: { id: newUser.id, email, name, role: newUser.role } });
   });
@@ -577,21 +831,17 @@ async function startServer() {
     const { email, password } = req.body;
     const db = await getDb();
     const user = db.users.find((u: any) => u.email === email);
-
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET);
     res.json({ token, user: { id: user.id, email, name: user.name, role: user.role } });
   });
 
   // ================= AUTH MIDDLEWARE =================
-
   const authenticate = (req: any, res: any, next: any) => {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Unauthorized" });
-
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       req.user = decoded;
@@ -601,99 +851,45 @@ async function startServer() {
     }
   };
 
-  // ================= PROJECTS =================
-
+  // ================= API ROUTES (Projects, Tasks, Users) =================
   app.get("/api/projects", authenticate, async (req: any, res) => {
     const db = await getDb();
-
-    if (req.user.role === "admin") {
-      return res.json(db.projects);
-    }
-
-    const projects = db.projects.filter((p: any) =>
-      p.managerId === req.user.id || p.memberIds.includes(req.user.id)
-    );
-
+    if (req.user.role === "admin") return res.json(db.projects);
+    const projects = db.projects.filter((p: any) => p.managerId === req.user.id || p.memberIds.includes(req.user.id));
     res.json(projects);
   });
 
   app.post("/api/projects", authenticate, async (req: any, res) => {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
+    if (req.user.role !== "admin") return res.status(403).json({ error: "Forbidden" });
     const { name, description, memberIds } = req.body;
     const db = await getDb();
-
-    const newProject = {
-      id: uuidv4(),
-      name,
-      description,
-      managerId: req.user.id,
-      memberIds: memberIds || [],
-      createdAt: new Date().toISOString()
-    };
-
+    const newProject = { id: uuidv4(), name, description, managerId: req.user.id, memberIds: memberIds || [], createdAt: new Date().toISOString() };
     db.projects.push(newProject);
     await saveDb(db);
-
     res.json(newProject);
   });
-
-  // ================= TASKS =================
 
   app.get("/api/tasks", authenticate, async (req: any, res) => {
     const db = await getDb();
     const { projectId } = req.query;
-
     let tasks = db.tasks;
-
-    if (projectId) {
-      tasks = tasks.filter((t: any) => t.projectId === projectId);
-    }
-
+    if (projectId) tasks = tasks.filter((t: any) => t.projectId === projectId);
     if (req.user.role !== "admin") {
-      const myProjects = db.projects
-        .filter((p: any) =>
-          p.managerId === req.user.id || p.memberIds.includes(req.user.id)
-        )
-        .map((p: any) => p.id);
-
-      tasks = tasks.filter(
-        (t: any) =>
-          myProjects.includes(t.projectId) || t.assigneeId === req.user.id
-      );
+      const myProjects = db.projects.filter((p: any) => p.managerId === req.user.id || p.memberIds.includes(req.user.id)).map((p: any) => p.id);
+      tasks = tasks.filter((t: any) => myProjects.includes(t.projectId) || t.assigneeId === req.user.id);
     }
-
     res.json(tasks);
   });
 
   app.post("/api/tasks", authenticate, async (req: any, res) => {
     const { title, description, projectId, assigneeId, priority, dueDate } = req.body;
     const db = await getDb();
-
     const project = db.projects.find((p: any) => p.id === projectId);
     if (!project) return res.status(404).json({ error: "Project not found" });
-
-    if (req.user.role !== "admin" && project.managerId !== req.user.id) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
-    const newTask = {
-      id: uuidv4(),
-      title,
-      description,
-      projectId,
-      assigneeId,
-      status: "todo",
-      priority: priority || "medium",
-      dueDate,
-      createdAt: new Date().toISOString()
-    };
-
+    if (req.user.role !== "admin" && project.managerId !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+    const newTask = { id: uuidv4(), title, description, projectId, assigneeId, status: "todo", priority: priority || "medium", dueDate, createdAt: new Date().toISOString() };
     db.tasks.push(newTask);
     await saveDb(db);
-
     res.json(newTask);
   });
 
@@ -701,47 +897,30 @@ async function startServer() {
     const { id } = req.params;
     const updates = req.body;
     const db = await getDb();
-
     const index = db.tasks.findIndex((t: any) => t.id === id);
     if (index === -1) return res.status(404).json({ error: "Task not found" });
-
     const task = db.tasks[index];
     const project = db.projects.find((p: any) => p.id === task.projectId);
-
     const isAdmin = req.user.role === "admin";
     const isManager = project?.managerId === req.user.id;
     const isAssignee = task.assigneeId === req.user.id;
-
-    if (!isAdmin && !isManager && !isAssignee) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
+    if (!isAdmin && !isManager && !isAssignee) return res.status(403).json({ error: "Forbidden" });
     if (!isAdmin && !isManager && isAssignee) {
       const allowed = ["status"];
       const invalid = Object.keys(updates).filter(k => !allowed.includes(k));
-      if (invalid.length > 0) {
-        return res.status(403).json({ error: "Only status can be updated" });
-      }
+      if (invalid.length > 0) return res.status(403).json({ error: "Only status can be updated" });
     }
-
     db.tasks[index] = { ...task, ...updates, updatedAt: new Date().toISOString() };
     await saveDb(db);
-
     res.json(db.tasks[index]);
   });
 
   app.get("/api/users", authenticate, async (req, res) => {
     const db = await getDb();
-    res.json(db.users.map((u: any) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role
-    })));
+    res.json(db.users.map((u: any) => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
   });
 
-  // ================= VITE =================
-
+  // ================= VITE / PRODUCTION UI LOADING =================
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -749,14 +928,15 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // SIMPLE RESPONSE FOR PRODUCTION (avoids dist issues)
+    // CORRECT PRODUCTION LOGIC: Serve the built "dist" folder
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.send("Server running in production 🚀");
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   // ================= START SERVER =================
-
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
